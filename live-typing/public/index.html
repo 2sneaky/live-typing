@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>live typing rooms</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="container">
+      <div id="join">
+        <input id="room" placeholder="enter room name" autocomplete="off" />
+        <button id="joinBtn">join</button>
+      </div>
+
+      <div id="app" hidden>
+        <div id="me">
+          <textarea id="input" placeholder="type here..."></textarea>
+          <button id="clearBtn">clear</button>
+        </div>
+        <div id="live">
+          <h3>room <span id="roomName"></span></h3>
+          <div id="streams"></div>
+        </div>
+      </div>
+
+      <input type="password" id="ownerPw" placeholder="•••" />
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
