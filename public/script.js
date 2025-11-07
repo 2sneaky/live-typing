@@ -35,7 +35,7 @@ let userId = Math.random().toString(36).substr(2, 8);
 // -------- Google Sign-In --------
 window.onload = function() {
   google.accounts.id.initialize({
-    client_id: "YOUR_GOOGLE_CLIENT_ID",
+    client_id: "988642885375-da5mgubj08fp7113tpi443nvdepobkvb.apps.googleusercontent.com",
     callback: handleCredentialResponse
   });
   google.accounts.id.renderButton(
@@ -120,3 +120,4 @@ ownerPw.addEventListener('change', () => {
     ownerPw.value = '';
   }
 });
+
