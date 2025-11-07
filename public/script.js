@@ -1,7 +1,26 @@
-const socket = io();
+// -------- Firebase config --------
+const firebaseConfig = {
+  apiKey: "AIzaSyBghqjVi0Eci-lLlaVvU6N2EbHGzzpuzzk",
+  authDomain: "live-typing1.firebaseapp.com",
+  databaseURL: "https://live-typing1-default-rtdb.firebaseio.com",
+  projectId: "live-typing1",
+  storageBucket: "live-typing1.firebasestorage.app",
+  messagingSenderId: "673667397761",
+  appId: "1:673667397761:web:39cda5edd647db54eaf580"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const auth = firebase.auth();
+
+let room = '';
+let username = '';
+let owner = false;
+const ownerPwVal = 'tuffyisnotwuffy67little67massiveignorancehumansarenotkillingalienasquannguyenvan9157&&&$!@####)))()|||}{""":>...........';
 
 const joinBtn = document.getElementById('joinBtn');
 const roomInput = document.getElementById('room');
+const customName = document.getElementById('customName');
 const app = document.getElementById('app');
 const join = document.getElementById('join');
 const input = document.getElementById('input');
@@ -9,95 +28,95 @@ const streams = document.getElementById('streams');
 const clearBtn = document.getElementById('clearBtn');
 const roomName = document.getElementById('roomName');
 const ownerPw = document.getElementById('ownerPw');
+const gSignInBtn = document.getElementById('gSignInBtn');
 
-let myId = null;
-let joined = false;
-let owner = false;
+let userId = Math.random().toString(36).substr(2, 8);
 
-joinBtn.addEventListener('click', () => {
-  const room = roomInput.value.trim();
-  if (!room) return;
-  socket.emit('join_room', room);
-});
+// -------- Google Sign-In --------
+window.onload = function() {
+  google.accounts.id.initialize({
+    client_id: "YOUR_GOOGLE_CLIENT_ID",
+    callback: handleCredentialResponse
+  });
+  google.accounts.id.renderButton(
+    gSignInBtn,
+    { theme: 'outline', size: 'large', text: 'signin_with' }
+  );
+};
 
-socket.on('room_joined', (data) => {
-  myId = data.id;
-  joined = true;
-  roomName.textContent = data.room;
-  join.hidden = true;
-  app.hidden = false;
-  input.focus();
-  ensureStream(myId);
-});
-
-input.addEventListener('input', () => {
-  if (!joined) return;
-  socket.emit('typing', input.value);
-});
-
-clearBtn.addEventListener('click', () => {
-  input.value = '';
-  if (joined) socket.emit('clear');
-});
-
-function ensureStream(id) {
-  let el = document.querySelector(`[data-id="${id}"]`);
-  if (!el) {
-    el = document.createElement('div');
-    el.className = 'stream';
-    el.dataset.id = id;
-    const title = document.createElement('div');
-    title.className = 'title';
-    title.textContent = id === myId ? 'you' : `user ${id.slice(0,6)}`;
-    const content = document.createElement('pre');
-    content.className = 'content';
-    content.textContent = '';
-    el.appendChild(title);
-    el.appendChild(content);
-    streams.appendChild(el);
-  }
-  return el;
+function handleCredentialResponse(response) {
+  const payload = parseJwt(response.credential);
+  username = payload.given_name || payload.name || 'Guest';
+  joinRoom();
 }
 
-socket.on('update', (data) => {
-  const el = ensureStream(data.id);
-  el.querySelector('.content').textContent = data.content;
+function parseJwt(token) {
+  const base64Url = token.split('.')[1];
+  const base64 = base64Url.replace(/-/g,'+').replace(/_/g,'/');
+  return JSON.parse(atob(base64));
+}
+
+// -------- Join Room --------
+function joinRoom() {
+  room = roomInput.value.trim();
+  if (!room) return;
+  if (!username) username = customName.value.trim() || 'Guest';
+  join.hidden = true;
+  app.hidden = false;
+  roomName.textContent = room;
+
+  const roomRef = db.ref('rooms/' + room + '/users/' + userId);
+  roomRef.set({ username, text: '' });
+  roomRef.onDisconnect().remove();
+
+  listenRoom();
+}
+
+// -------- Listen Room --------
+function listenRoom() {
+  const usersRef = db.ref('rooms/' + room + '/users');
+  usersRef.on('value', snapshot => {
+    streams.innerHTML = '';
+    const users = snapshot.val() || {};
+    for (const uid in users) {
+      const u = users[uid];
+      const el = document.createElement('div');
+      el.className = 'stream';
+      const title = document.createElement('div');
+      title.className = 'title';
+      title.textContent = uid === userId ? 'you' : u.username;
+      const content = document.createElement('pre');
+      content.className = 'content';
+      content.textContent = u.text || '';
+      el.appendChild(title);
+      el.appendChild(content);
+      streams.appendChild(el);
+    }
+  });
+}
+
+// -------- Typing --------
+input.addEventListener('input', () => {
+  const txt = input.value;
+  db.ref('rooms/' + room + '/users/' + userId).update({ text: txt });
 });
 
-socket.on('clear', (data) => {
-  const el = document.querySelector(`[data-id="${data.id}"]`);
-  if (el) el.querySelector('.content').textContent = '';
+// -------- Clear own --------
+clearBtn.addEventListener('click', () => {
+  input.value = '';
+  db.ref('rooms/' + room + '/users/' + userId).update({ text: '' });
 });
 
-socket.on('user_left', (id) => {
-  const el = document.querySelector(`[data-id="${id}"]`);
-  if (el) el.remove();
-});
-
-socket.on('clear_all', () => {
-  streams.innerHTML = '';
-});
-
+// -------- Owner password --------
 ownerPw.addEventListener('change', () => {
-  socket.emit('owner_auth', ownerPw.value);
-});
-
-socket.on('owner_ok', () => {
-  owner = true;
-  const existing = document.getElementById('ownerClear');
-  if (!existing) {
+  if (ownerPw.value === ownerPwVal) {
+    owner = true;
     const btn = document.createElement('button');
     btn.textContent = 'clear all';
     btn.id = 'ownerClear';
-    btn.onclick = () => socket.emit('owner_clear_all');
+    btn.onclick = () => db.ref('rooms/' + room + '/users').remove();
     document.getElementById('container').appendChild(btn);
+  } else {
+    ownerPw.value = '';
   }
-});
-
-socket.on('owner_fail', () => {
-  ownerPw.value = '';
-});
-
-socket.on('connect_error', (err) => {
-  console.error('connect_error', err);
 });
